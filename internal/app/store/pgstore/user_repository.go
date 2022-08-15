@@ -36,6 +36,7 @@ func (u *UserRepository) FindByID(id int) (*model.User, error) {
 		id,
 	).Scan(
 		&user.ID,
+		&user.Login,
 		&user.EncryptedPassword,
 		&user.Deleted,
 		&user.DeletedAt,
