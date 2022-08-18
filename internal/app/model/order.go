@@ -53,12 +53,9 @@ func (s *OrderStatus) Value() (driver.Value, error) {
 }
 
 func (s *OrderStatus) Scan(value interface{}) error {
-	if v, ok := value.([]uint8); ok {
-		*s = s.UnmarshalOrderStatus(string(v))
-		return nil
-	}
+	*s = s.UnmarshalOrderStatus(fmt.Sprintf("%s", value))
 
-	return fmt.Errorf("can't convert %T to OrderStatus", value)
+	return nil
 }
 
 func (s *OrderStatus) MarshalJSON() ([]byte, error) {
