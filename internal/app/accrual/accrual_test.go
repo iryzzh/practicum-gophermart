@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/shirou/gopsutil/v3/process"
 	"github.com/stretchr/testify/assert"
 	"iryzzh/practicum-gophermart/cmd/gophermart/config"
 	"iryzzh/practicum-gophermart/internal/app/model"
@@ -14,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -70,14 +72,14 @@ func TestAccrual(t *testing.T) {
 	cfg, err := config.New()
 	assert.NoError(t, err)
 
-	var binary string
+	var binaryName string
 	switch runtime.GOOS {
 	case "windows":
-		binary = "accrual_windows_amd64.exe"
+		binaryName = "accrual_windows_amd64.exe"
 	case "linux":
-		binary = "accrual_linux_amd64"
+		binaryName = "accrual_linux_amd64"
 	default:
-		binary = "accrual_darwin_amd64"
+		binaryName = "accrual_darwin_amd64"
 	}
 
 	s, teardown := pgstore.TestDB(t, cfg.DatabaseURI)
@@ -86,7 +88,7 @@ func TestAccrual(t *testing.T) {
 	client := New(s, cfg.AccrualSystemAddress, time.Second)
 
 	path, _ := os.Getwd()
-	binary, _ = filepath.Abs(fmt.Sprintf("%s/../../../cmd/accrual/%s", path, binary))
+	binary, _ := filepath.Abs(fmt.Sprintf("%s/../../../cmd/accrual/%s", path, binaryName))
 	_, err = os.Stat(binary)
 	assert.NoError(t, err)
 
@@ -95,9 +97,35 @@ func TestAccrual(t *testing.T) {
 
 	cmd := exec.Command(binary, "-a", addr.Host, "-d", cfg.DatabaseURI)
 
+	done := make(chan bool, 1)
 	go func() {
 		err := cmd.Run()
 		assert.NoError(t, err)
+
+		<-done
+
+		processes, err := process.Processes()
+		if err != nil {
+			t.Error("get process failed:", err)
+			return
+		}
+
+		for _, p := range processes {
+			name, err := p.Name()
+			if err != nil {
+				t.Error("get process name err:", err)
+				return
+			}
+			if name == binary {
+				if err := p.SendSignal(syscall.SIGINT); err != nil {
+					if err := p.Kill(); err != nil {
+						t.Error("process kill err:", err)
+						return
+					}
+				}
+				return
+			}
+		}
 	}()
 
 	time.Sleep(1 * time.Second)
@@ -135,4 +163,6 @@ func TestAccrual(t *testing.T) {
 			assert.NoError(t, s.Order().Update(order))
 		})
 	}
+
+	done <- true
 }
