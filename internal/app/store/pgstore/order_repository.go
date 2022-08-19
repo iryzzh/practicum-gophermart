@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"iryzzh/practicum-gophermart/internal/app/model"
 	"iryzzh/practicum-gophermart/internal/app/store"
-	"sort"
 	"time"
 )
 
@@ -39,7 +38,7 @@ func (o *OrderRepository) Incomplete() ([]*model.Order, error) {
 	processing := model.OrderProcessing
 
 	rows, err := o.store.db.Query(
-		"select id, user_id, number, status, accrual, uploaded_at, deleted, deleted_at from orders where status in ($1,$2)",
+		"select id, user_id, number, status, accrual, uploaded_at, deleted, deleted_at from orders where status in ($1,$2) order by uploaded_at",
 		orderNew.String(), processing.String())
 	if err != nil {
 		return nil, err
@@ -63,10 +62,6 @@ func (o *OrderRepository) Incomplete() ([]*model.Order, error) {
 	if len(orders) == 0 {
 		return nil, store.ErrRecordNotFound
 	}
-
-	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].UploadedAt.String() > orders[j].UploadedAt.String()
-	})
 
 	return orders, nil
 }
@@ -177,7 +172,7 @@ func (o *OrderRepository) GetByUserID(userID int) ([]*model.Order, error) {
 	var orders []*model.Order
 
 	rows, err := o.store.db.Query(
-		"select id, user_id, number, status, accrual, uploaded_at, deleted, deleted_at from orders where user_id = $1",
+		"select id, user_id, number, status, accrual, uploaded_at, deleted, deleted_at from orders where user_id = $1 order by uploaded_at desc",
 		userID)
 	if err != nil {
 		return nil, err
@@ -201,10 +196,6 @@ func (o *OrderRepository) GetByUserID(userID int) ([]*model.Order, error) {
 	if len(orders) == 0 {
 		return nil, store.ErrRecordNotFound
 	}
-
-	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].UploadedAt.String() > orders[j].UploadedAt.String()
-	})
 
 	return orders, nil
 }
